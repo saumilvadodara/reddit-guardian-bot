@@ -34,7 +34,7 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'ModBot/1.0 by YourUsername'
+        'User-Agent': 'web:ModBot:v1.0.0 (by /u/YourUsername)'
       }
     });
 
