@@ -31,20 +31,21 @@ serve(async (req) => {
     console.log(`Making Reddit API call to: ${url}`);
 
     const response = await fetch(url, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'ModBot/1.0'
+        'User-Agent': 'ModBot/1.0 by YourUsername'
       }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Reddit API error:', response.status, errorText);
-      throw new Error(`Reddit API error: ${response.status}`);
+      throw new Error(`Reddit API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Reddit API response received');
+    console.log('Reddit API response received successfully');
 
     return new Response(
       JSON.stringify(data),
