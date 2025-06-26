@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -8,6 +7,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { ActiveMonitoring } from "@/components/ActiveMonitoring";
 import { RecentAlerts } from "@/components/RecentAlerts";
 import { useAuth } from "@/hooks/useAuth";
+import { RedditConnection } from "@/components/RedditConnection";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -50,7 +50,12 @@ const Index = () => {
               <p className="text-gray-600">Monitor your Reddit communities and streamline moderation tasks</p>
             </div>
             
-            <DashboardStats />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <DashboardStats />
+              </div>
+              <RedditConnection />
+            </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <ActiveMonitoring />
