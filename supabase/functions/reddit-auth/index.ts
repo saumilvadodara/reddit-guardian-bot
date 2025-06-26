@@ -17,7 +17,12 @@ serve(async (req) => {
     
     const clientId = Deno.env.get('REDDIT_CLIENT_ID');
     const clientSecret = Deno.env.get('REDDIT_CLIENT_SECRET');
-    const redirectUri = `${req.headers.get('origin')}/reddit-callback`;
+    
+    // Use the origin from the request to construct the redirect URI
+    const origin = req.headers.get('origin') || 'https://reddit-guardian-bot.lovable.app';
+    const redirectUri = `${origin}/reddit-callback`;
+
+    console.log('Reddit auth request:', { action, origin, redirectUri });
 
     if (!clientId || !clientSecret) {
       throw new Error('Reddit credentials not configured');
@@ -32,6 +37,8 @@ serve(async (req) => {
         `duration=permanent&` +
         `scope=identity read modposts modflair modcontributors`;
 
+      console.log('Generated auth URL:', authUrl);
+
       return new Response(
         JSON.stringify({ authUrl }),
         { 
@@ -41,6 +48,8 @@ serve(async (req) => {
     }
 
     if (action === 'exchangeCode') {
+      console.log('Exchanging code for token...');
+      
       const tokenResponse = await fetch('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
@@ -54,8 +63,11 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       
       if (!tokenResponse.ok) {
+        console.error('Token exchange error:', tokenData);
         throw new Error(tokenData.error || 'Failed to exchange code for token');
       }
+
+      console.log('Token exchange successful');
 
       return new Response(
         JSON.stringify({ accessToken: tokenData.access_token }),
