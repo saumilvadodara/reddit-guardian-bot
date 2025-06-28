@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -48,7 +47,16 @@ export function useRedditAuth() {
       }
 
       console.log('Reddit user data received:', data);
-      setRedditUser(data);
+      
+      // Map the Reddit API response to our RedditUser interface
+      const mappedUser: RedditUser = {
+        name: data.name,
+        id: data.id,
+        is_mod: data.is_mod || false,
+        total_karma: data.total_karma || 0
+      };
+      
+      setRedditUser(mappedUser);
       
       toast({
         title: "Success",
@@ -63,7 +71,7 @@ export function useRedditAuth() {
       setRedditUser(null);
       
       toast({
-        title: "Error",
+        title: "Authentication Error",
         description: "Failed to fetch Reddit user data. Please reconnect your account.",
         variant: "destructive",
       });

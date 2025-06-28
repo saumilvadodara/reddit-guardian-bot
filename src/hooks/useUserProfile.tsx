@@ -23,6 +23,8 @@ export function useUserProfile() {
 
     setLoading(true);
     try {
+      console.log('Creating/updating profile for user:', user.id, 'reddit user:', redditUser);
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .upsert({
@@ -31,17 +33,29 @@ export function useUserProfile() {
           reddit_id: redditUser.id,
           is_mod: redditUser.is_mod || false,
           total_karma: redditUser.total_karma || 0
+        }, {
+          onConflict: 'user_id'
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile upsert error:', error);
+        throw error;
+      }
+      
+      console.log('Profile created/updated successfully:', data);
       setProfile(data);
+      
+      toast({
+        title: "Profile Synced",
+        description: "Reddit profile data has been synchronized",
+      });
     } catch (error) {
       console.error('Error managing user profile:', error);
       toast({
-        title: "Profile Error",
-        description: "Failed to sync Reddit profile data",
+        title: "Profile Sync Error",
+        description: "Failed to sync Reddit profile data. Please try reconnecting your Reddit account.",
         variant: "destructive",
       });
     } finally {
@@ -49,5 +63,5 @@ export function useUserProfile() {
     }
   };
 
-  return { profile, loading };
+  return { profile, loading, createOrUpdateProfile };
 }
