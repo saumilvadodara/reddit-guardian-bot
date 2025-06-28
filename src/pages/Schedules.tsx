@@ -14,6 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type ScheduleFrequency = Database['public']['Enums']['schedule_frequency'];
 
 const Schedules = () => {
   const { user } = useAuth();
@@ -26,7 +29,7 @@ const Schedules = () => {
     name: '',
     description: '',
     community_id: '',
-    frequency: 'daily',
+    frequency: 'daily' as ScheduleFrequency,
     is_active: true
   });
 
@@ -108,7 +111,7 @@ const Schedules = () => {
         name: '',
         description: '',
         community_id: '',
-        frequency: 'daily',
+        frequency: 'daily' as ScheduleFrequency,
         is_active: true
       });
       
@@ -240,7 +243,7 @@ const Schedules = () => {
                   <Label htmlFor="frequency">Frequency</Label>
                   <Select
                     value={newSchedule.frequency}
-                    onValueChange={(value) => setNewSchedule({ ...newSchedule, frequency: value })}
+                    onValueChange={(value) => setNewSchedule({ ...newSchedule, frequency: value as ScheduleFrequency })}
                   >
                     <SelectTrigger>
                       <SelectValue />

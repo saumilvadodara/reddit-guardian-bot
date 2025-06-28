@@ -14,6 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type MonitoringType = Database['public']['Enums']['monitoring_type'];
 
 const Monitoring = () => {
   const { user } = useAuth();
@@ -25,7 +28,7 @@ const Monitoring = () => {
   const [newRule, setNewRule] = useState({
     name: '',
     community_id: '',
-    monitoring_type: 'comments',
+    monitoring_type: 'comments' as MonitoringType,
     keywords: '',
     is_active: true
   });
@@ -91,7 +94,7 @@ const Monitoring = () => {
       setNewRule({
         name: '',
         community_id: '',
-        monitoring_type: 'comments',
+        monitoring_type: 'comments' as MonitoringType,
         keywords: '',
         is_active: true
       });
@@ -199,7 +202,7 @@ const Monitoring = () => {
                   <Label htmlFor="monitoring-type">Monitoring Type</Label>
                   <Select
                     value={newRule.monitoring_type}
-                    onValueChange={(value) => setNewRule({ ...newRule, monitoring_type: value })}
+                    onValueChange={(value) => setNewRule({ ...newRule, monitoring_type: value as MonitoringType })}
                   >
                     <SelectTrigger>
                       <SelectValue />

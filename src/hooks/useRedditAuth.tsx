@@ -7,6 +7,7 @@ interface RedditUser {
   name: string;
   id: string;
   is_mod: boolean;
+  total_karma?: number;
 }
 
 export function useRedditAuth() {
