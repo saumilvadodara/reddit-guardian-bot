@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -7,10 +8,12 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { ActiveMonitoring } from "@/components/ActiveMonitoring";
 import { RecentAlerts } from "@/components/RecentAlerts";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { RedditConnection } from "@/components/RedditConnection";
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const { profile } = useUserProfile();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,7 +43,7 @@ const Index = () => {
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <Header user={{
-            username: user.user_metadata?.full_name || user.email || "User",
+            username: profile?.reddit_username || user.user_metadata?.full_name || user.email || "User",
             avatar: user.user_metadata?.avatar_url,
             isAuthenticated: true
           }} />
