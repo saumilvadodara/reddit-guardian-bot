@@ -25,21 +25,45 @@ export function useRedditAuth() {
   }, []);
 
   const fetchRedditUser = async (token: string) => {
+    console.log('Fetching Reddit user with token:', token.substring(0, 10) + '...');
     try {
       const { data, error } = await supabase.functions.invoke('reddit-api', {
         body: { 
-          endpoint: 'me',
+          endpoint: 'api/v1/me',
           token: token
         }
       });
 
-      if (error) throw error;
+      console.log('Supabase function response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+      
+      if (data && data.error) {
+        console.error('Reddit API returned error:', data.error);
+        throw new Error(data.error);
+      }
+
+      console.log('Reddit user data received:', data);
       setRedditUser(data);
+      
+      toast({
+        title: "Success",
+        description: `Connected as u/${data.name}`,
+      });
     } catch (error) {
       console.error('Error fetching Reddit user:', error);
+      
+      // Clear invalid token
+      localStorage.removeItem('reddit_token');
+      setRedditToken(null);
+      setRedditUser(null);
+      
       toast({
         title: "Error",
-        description: "Failed to fetch Reddit user data",
+        description: "Failed to fetch Reddit user data. Please reconnect your account.",
         variant: "destructive",
       });
     }
