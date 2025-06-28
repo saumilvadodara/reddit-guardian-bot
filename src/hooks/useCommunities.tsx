@@ -61,7 +61,6 @@ export function useCommunities() {
     try {
       console.log('Fetching moderated subreddits...');
       
-      // Try to get moderated subreddits
       const { data, error } = await supabase.functions.invoke('reddit-api', {
         body: { 
           endpoint: 'subreddits/mine/moderator',
@@ -73,19 +72,16 @@ export function useCommunities() {
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw error;
+        throw new Error(error.message || 'Failed to fetch moderated subreddits');
       }
 
+      // Handle the case where the response contains an error field
       if (data && data.error) {
-        console.error('Reddit API returned error:', data.error);
-        
-        // If we get a 403, it might mean the user has no moderated subreddits
-        // or the scope is insufficient. Let's inform the user appropriately.
-        if (data.error.includes('403') || data.error.includes('Forbidden')) {
+        // If it's about no moderated communities, handle gracefully
+        if (data.error.includes('No moderated communities') || data.error.includes('insufficient permissions')) {
           toast({
             title: "No Moderated Communities",
             description: "You don't appear to moderate any subreddits, or your Reddit account needs additional permissions.",
-            variant: "destructive",
           });
           return;
         }
@@ -143,11 +139,12 @@ export function useCommunities() {
           description: `Successfully synced ${successCount} moderated communities`,
         });
       } else {
-        console.log('Unexpected data structure:', data);
+        console.log('Unexpected data structure or empty response:', data);
+        
+        // Handle case where user has no moderated subreddits
         toast({
-          title: "Unexpected Response",
-          description: "Received unexpected data from Reddit API",
-          variant: "destructive",
+          title: "No Communities Found",
+          description: "No moderated communities found for your Reddit account",
         });
       }
     } catch (error) {

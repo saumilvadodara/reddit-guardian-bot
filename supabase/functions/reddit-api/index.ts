@@ -46,16 +46,52 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error('Reddit API error response:', errorText);
       
-      // If it's a 401, the token might be expired or invalid
+      // Handle specific error cases
       if (response.status === 401) {
-        throw new Error('Reddit authentication failed - token may be expired');
+        return new Response(
+          JSON.stringify({ error: 'Reddit authentication failed - token may be expired' }),
+          { 
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
       
-      throw new Error(`Reddit API error: ${response.status} - ${errorText}`);
+      if (response.status === 403) {
+        // For 403 errors, return a more specific message
+        if (endpoint.includes('moderator')) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'No moderated communities found or insufficient permissions',
+              data: { data: { children: [] } } // Return empty array structure
+            }),
+            { 
+              status: 200, // Return 200 with empty data instead of error
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ error: 'Access forbidden - insufficient permissions' }),
+          { 
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: `Reddit API error: ${response.status} - ${errorText}` }),
+        { 
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const data = await response.json();
-    console.log('Reddit API response received successfully:', JSON.stringify(data, null, 2));
+    console.log('Reddit API response received successfully');
 
     return new Response(
       JSON.stringify(data),
@@ -65,11 +101,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Reddit API error:', error);
+    console.error('Reddit API edge function error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
