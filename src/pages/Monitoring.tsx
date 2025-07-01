@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useToast } from '@/hooks/use-toast';
+import { BackButton } from '@/components/BackButton';
 import type { Database } from '@/integrations/supabase/types';
 
 type MonitoringType = Database['public']['Enums']['monitoring_type'];
@@ -149,6 +150,8 @@ const Monitoring = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        <BackButton to="/" />
+        
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Active Monitoring</h1>

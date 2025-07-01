@@ -1,5 +1,6 @@
 
 import { Home, Settings, Shield, Bell, Users, Calendar } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 
 const navigationItems = [
@@ -20,7 +21,7 @@ const navigationItems = [
   },
   {
     title: "Schedule",
-    url: "/schedule",
+    url: "/schedules",
     icon: Calendar,
   },
   {
@@ -36,6 +37,8 @@ const navigationItems = [
 ];
 
 export function AppSidebar() {
+  const location = useLocation();
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -55,10 +58,15 @@ export function AppSidebar() {
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url} className="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
+                    <Link 
+                      to={item.url} 
+                      className={`flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors ${
+                        location.pathname === item.url ? 'bg-blue-50 text-blue-600 font-medium' : ''
+                      }`}
+                    >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
