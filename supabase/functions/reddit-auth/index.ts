@@ -27,17 +27,23 @@ serve(async (req) => {
     }
 
     if (action === 'getAuthUrl') {
-      // Updated scopes to include all necessary permissions for moderators
+      // Comprehensive scopes for full moderator access
       const scopes = [
-        'identity',      // Basic user info
-        'read',          // Read posts and comments
-        'modposts',      // Moderate posts
-        'modflair',      // Moderate flairs
-        'modcontributors', // Moderate contributors
-        'modconfig',     // Moderate subreddit configuration
-        'modothers',     // Other moderator permissions
-        'modself',       // Moderate own posts
-        'modwiki'        // Moderate wiki
+        'identity',          // Basic user info
+        'read',             // Read posts and comments
+        'modposts',         // Moderate posts (approve, remove, etc.)
+        'modflair',         // Moderate flairs
+        'modcontributors',  // Moderate contributors
+        'modconfig',        // Moderate subreddit configuration
+        'modothers',        // Other moderator permissions
+        'modself',          // Moderate own posts
+        'modwiki',          // Moderate wiki
+        'modmail',          // Access to modmail
+        'modlog',           // Access to moderation log
+        'submit',           // Submit posts (sometimes needed for mod actions)
+        'edit',             // Edit posts/comments (for mod actions)
+        'vote',             // Vote on posts/comments
+        'mysubreddits'      // Access to user's subreddits
       ].join(' ');
 
       const authUrl = `https://www.reddit.com/api/v1/authorize?` +
@@ -48,7 +54,7 @@ serve(async (req) => {
         `duration=permanent&` +
         `scope=${encodeURIComponent(scopes)}`;
 
-      console.log('Generated auth URL:', authUrl);
+      console.log('Generated auth URL with comprehensive scopes:', authUrl);
 
       return new Response(
         JSON.stringify({ authUrl }),
@@ -75,12 +81,16 @@ serve(async (req) => {
 
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
-        console.error('Token exchange error:', errorText);
-        throw new Error(tokenResponse.status.toString());
+        console.error('Token exchange failed:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
       }
 
       const tokenData = await tokenResponse.json();
-      console.log('Token exchange successful');
+      console.log('Token exchange successful, received scopes:', tokenData.scope);
 
       return new Response(
         JSON.stringify({ accessToken: tokenData.access_token }),

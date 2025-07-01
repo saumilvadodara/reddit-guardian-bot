@@ -49,42 +49,54 @@ serve(async (req) => {
       // Handle specific error cases
       if (response.status === 401) {
         return new Response(
-          JSON.stringify({ error: 'Reddit authentication failed - token may be expired. Please reconnect your Reddit account.' }),
+          JSON.stringify({ 
+            error: 'Reddit authentication failed - token may be expired. Please reconnect your Reddit account.',
+            needsReauth: true 
+          }),
           { 
-            status: 401,
+            status: 200, // Return 200 to prevent edge function error
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
         );
       }
       
       if (response.status === 403) {
-        // For 403 errors on moderator endpoints, provide more specific guidance
-        if (endpoint.includes('moderator')) {
+        // For 403 errors, check if it's the moderator endpoint
+        if (endpoint.includes('moderator') || endpoint.includes('mine/moderator')) {
+          console.log('403 error on moderator endpoint - user may not have moderator permissions');
           return new Response(
             JSON.stringify({ 
-              error: 'Reddit API returned 403 Forbidden. This usually means: 1) You need to reconnect your Reddit account with updated permissions, 2) Your Reddit app needs additional scopes, or 3) You may not have moderator permissions on any subreddits.',
-              needsReauth: true // Flag to indicate user should reconnect
+              data: { children: [] }, // Return empty array structure
+              error: null,
+              message: 'No moderated communities found. This could mean: 1) You are not a moderator of any subreddits, 2) You need to reconnect with updated permissions, or 3) Your Reddit app needs additional configuration.'
             }),
             { 
-              status: 403,
+              status: 200, // Return 200 to prevent edge function error
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             }
           );
         }
         
         return new Response(
-          JSON.stringify({ error: 'Access forbidden - insufficient permissions' }),
+          JSON.stringify({ 
+            error: 'Access forbidden - insufficient permissions. Please reconnect your Reddit account with updated permissions.',
+            needsReauth: true 
+          }),
           { 
-            status: 403,
+            status: 200, // Return 200 to prevent edge function error
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
         );
       }
       
+      // For other errors, still return 200 to prevent edge function failures
       return new Response(
-        JSON.stringify({ error: `Reddit API error: ${response.status} - ${errorText}` }),
+        JSON.stringify({ 
+          error: `Reddit API error: ${response.status} - ${errorText}`,
+          status: response.status 
+        }),
         { 
-          status: response.status,
+          status: 200, // Return 200 to prevent edge function error
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -105,7 +117,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 500,
+        status: 200, // Return 200 to prevent edge function error
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

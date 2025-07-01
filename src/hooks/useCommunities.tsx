@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,23 +78,22 @@ export function useCommunities() {
       if (data && data.needsReauth) {
         toast({
           title: "Re-authentication Required",
-          description: "Your Reddit permissions have changed. Please disconnect and reconnect your Reddit account with updated permissions.",
+          description: "Your Reddit permissions need to be updated. Please disconnect and reconnect your Reddit account.",
           variant: "destructive",
         });
-        // Optionally auto-disconnect the user
         disconnectReddit();
         return;
       }
 
-      // Handle the case where the response contains an error field
+      // Handle error responses from our edge function
       if (data && data.error) {
         console.error('Reddit API returned error:', data.error);
         
-        if (data.error.includes('403 Forbidden')) {
+        // If it's a permission issue with empty data, show helpful message
+        if (data.data && data.data.children && data.data.children.length === 0) {
           toast({
-            title: "Permission Issue",
-            description: "Reddit is denying access to moderator data. Try disconnecting and reconnecting your Reddit account, or check if you have moderator permissions on any subreddits.",
-            variant: "destructive",
+            title: "No Moderated Communities Found",
+            description: data.message || "You don't appear to moderate any subreddits, or you need to reconnect with updated permissions.",
           });
           return;
         }
@@ -112,7 +110,7 @@ export function useCommunities() {
         if (subreddits.length === 0) {
           toast({
             title: "No Communities Found",
-            description: "No moderated communities found for your account. Make sure you are a moderator of at least one subreddit.",
+            description: "No moderated communities found for your account. Make sure you are a moderator of at least one subreddit, then try reconnecting your Reddit account.",
           });
           return;
         }
@@ -156,15 +154,15 @@ export function useCommunities() {
         console.log('Unexpected data structure or empty response:', data);
         
         toast({
-          title: "No Communities Found",
-          description: "No moderated communities found. Please ensure you are a moderator of at least one subreddit and try reconnecting your Reddit account.",
+          title: "Sync Issue",
+          description: "Unable to process community data. Please try disconnecting and reconnecting your Reddit account with full moderator permissions.",
         });
       }
     } catch (error) {
       console.error('Error fetching moderated subreddits:', error);
       toast({
         title: "Sync Error",
-        description: `Failed to sync communities: ${error.message}`,
+        description: `Failed to sync communities: ${error.message}. Try reconnecting your Reddit account.`,
         variant: "destructive",
       });
     } finally {
