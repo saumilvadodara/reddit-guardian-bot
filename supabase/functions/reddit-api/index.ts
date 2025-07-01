@@ -49,7 +49,7 @@ serve(async (req) => {
       // Handle specific error cases
       if (response.status === 401) {
         return new Response(
-          JSON.stringify({ error: 'Reddit authentication failed - token may be expired' }),
+          JSON.stringify({ error: 'Reddit authentication failed - token may be expired. Please reconnect your Reddit account.' }),
           { 
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -58,15 +58,15 @@ serve(async (req) => {
       }
       
       if (response.status === 403) {
-        // For 403 errors, return a more specific message
+        // For 403 errors on moderator endpoints, provide more specific guidance
         if (endpoint.includes('moderator')) {
           return new Response(
             JSON.stringify({ 
-              error: 'No moderated communities found or insufficient permissions',
-              data: { data: { children: [] } } // Return empty array structure
+              error: 'Reddit API returned 403 Forbidden. This usually means: 1) You need to reconnect your Reddit account with updated permissions, 2) Your Reddit app needs additional scopes, or 3) You may not have moderator permissions on any subreddits.',
+              needsReauth: true // Flag to indicate user should reconnect
             }),
             { 
-              status: 200, // Return 200 with empty data instead of error
+              status: 403,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             }
           );

@@ -14,66 +14,77 @@ serve(async (req) => {
 
   try {
     const { action, code } = await req.json();
-    
-    const clientId = Deno.env.get('REDDIT_CLIENT_ID');
-    const clientSecret = Deno.env.get('REDDIT_CLIENT_SECRET');
-    
-    // Use the origin from the request to construct the redirect URI
-    const origin = req.headers.get('origin') || 'https://reddit-guardian-bot.lovable.app';
+    const origin = req.headers.get('origin') || 'http://localhost:3000';
     const redirectUri = `${origin}/reddit-callback`;
 
     console.log('Reddit auth request:', { action, origin, redirectUri });
 
+    const clientId = Deno.env.get('REDDIT_CLIENT_ID');
+    const clientSecret = Deno.env.get('REDDIT_CLIENT_SECRET');
+
     if (!clientId || !clientSecret) {
-      throw new Error('Reddit credentials not configured');
+      throw new Error('Reddit client credentials not configured');
     }
 
     if (action === 'getAuthUrl') {
+      // Updated scopes to include all necessary permissions for moderators
+      const scopes = [
+        'identity',      // Basic user info
+        'read',          // Read posts and comments
+        'modposts',      // Moderate posts
+        'modflair',      // Moderate flairs
+        'modcontributors', // Moderate contributors
+        'modconfig',     // Moderate subreddit configuration
+        'modothers',     // Other moderator permissions
+        'modself',       // Moderate own posts
+        'modwiki'        // Moderate wiki
+      ].join(' ');
+
       const authUrl = `https://www.reddit.com/api/v1/authorize?` +
         `client_id=${clientId}&` +
         `response_type=code&` +
         `state=random_string&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `duration=permanent&` +
-        `scope=identity read modposts modflair modcontributors`;
+        `scope=${encodeURIComponent(scopes)}`;
 
       console.log('Generated auth URL:', authUrl);
 
       return new Response(
         JSON.stringify({ authUrl }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (action === 'exchangeCode') {
       console.log('Exchanging code for token...');
-      
+
       const tokenResponse = await fetch('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'ModBot/1.0'
+          'User-Agent': 'ModBot:v1.0.0 (by /u/ModBotUser)',
         },
-        body: `grant_type=authorization_code&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: redirectUri,
+        }),
       });
 
-      const tokenData = await tokenResponse.json();
-      
       if (!tokenResponse.ok) {
-        console.error('Token exchange error:', tokenData);
-        throw new Error(tokenData.error || 'Failed to exchange code for token');
+        const errorText = await tokenResponse.text();
+        console.error('Token exchange error:', errorText);
+        throw new Error(tokenResponse.status.toString());
       }
 
+      const tokenData = await tokenResponse.json();
       console.log('Token exchange successful');
 
       return new Response(
         JSON.stringify({ accessToken: tokenData.access_token }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -84,7 +95,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export function useCommunities() {
   const { user } = useAuth();
-  const { redditToken } = useRedditAuth();
+  const { redditToken, disconnectReddit } = useRedditAuth();
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -75,13 +75,27 @@ export function useCommunities() {
         throw new Error(error.message || 'Failed to fetch moderated subreddits');
       }
 
+      // Handle the case where we need re-authentication
+      if (data && data.needsReauth) {
+        toast({
+          title: "Re-authentication Required",
+          description: "Your Reddit permissions have changed. Please disconnect and reconnect your Reddit account with updated permissions.",
+          variant: "destructive",
+        });
+        // Optionally auto-disconnect the user
+        disconnectReddit();
+        return;
+      }
+
       // Handle the case where the response contains an error field
       if (data && data.error) {
-        // If it's about no moderated communities, handle gracefully
-        if (data.error.includes('No moderated communities') || data.error.includes('insufficient permissions')) {
+        console.error('Reddit API returned error:', data.error);
+        
+        if (data.error.includes('403 Forbidden')) {
           toast({
-            title: "No Moderated Communities",
-            description: "You don't appear to moderate any subreddits, or your Reddit account needs additional permissions.",
+            title: "Permission Issue",
+            description: "Reddit is denying access to moderator data. Try disconnecting and reconnecting your Reddit account, or check if you have moderator permissions on any subreddits.",
+            variant: "destructive",
           });
           return;
         }
@@ -98,7 +112,7 @@ export function useCommunities() {
         if (subreddits.length === 0) {
           toast({
             title: "No Communities Found",
-            description: "No moderated communities found for your account",
+            description: "No moderated communities found for your account. Make sure you are a moderator of at least one subreddit.",
           });
           return;
         }
@@ -141,10 +155,9 @@ export function useCommunities() {
       } else {
         console.log('Unexpected data structure or empty response:', data);
         
-        // Handle case where user has no moderated subreddits
         toast({
           title: "No Communities Found",
-          description: "No moderated communities found for your Reddit account",
+          description: "No moderated communities found. Please ensure you are a moderator of at least one subreddit and try reconnecting your Reddit account.",
         });
       }
     } catch (error) {
