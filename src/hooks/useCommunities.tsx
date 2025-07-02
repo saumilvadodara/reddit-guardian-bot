@@ -75,30 +75,14 @@ export function useCommunities() {
       }
 
       // Handle the case where we need re-authentication
-      if (data && data.needsReauth) {
+      if (data && data.error && data.error.includes('401')) {
         toast({
           title: "Re-authentication Required",
-          description: "Your Reddit permissions need to be updated. Please disconnect and reconnect your Reddit account.",
+          description: "Your Reddit session has expired. Please reconnect your Reddit account.",
           variant: "destructive",
         });
         disconnectReddit();
         return;
-      }
-
-      // Handle error responses from our edge function
-      if (data && data.error) {
-        console.error('Reddit API returned error:', data.error);
-        
-        // If it's a permission issue with empty data, show helpful message
-        if (data.data && data.data.children && data.data.children.length === 0) {
-          toast({
-            title: "No Moderated Communities Found",
-            description: data.message || "You don't appear to moderate any subreddits, or you need to reconnect with updated permissions.",
-          });
-          return;
-        }
-        
-        throw new Error(data.error);
       }
 
       // Check if we have valid data structure
@@ -110,7 +94,7 @@ export function useCommunities() {
         if (subreddits.length === 0) {
           toast({
             title: "No Communities Found",
-            description: "No moderated communities found for your account. Make sure you are a moderator of at least one subreddit, then try reconnecting your Reddit account.",
+            description: "No moderated communities found for your account. Make sure you are a moderator of at least one subreddit.",
           });
           return;
         }
@@ -155,7 +139,7 @@ export function useCommunities() {
         
         toast({
           title: "Sync Issue",
-          description: "Unable to process community data. Please try disconnecting and reconnecting your Reddit account with full moderator permissions.",
+          description: "Unable to process community data. Please try reconnecting your Reddit account.",
         });
       }
     } catch (error) {

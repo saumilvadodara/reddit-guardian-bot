@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +26,7 @@ export function useRedditAuth() {
   }, []);
 
   const fetchRedditUser = async (token: string) => {
-    console.log('Fetching Reddit user with token:', token.substring(0, 10) + '...');
+    console.log('Fetching Reddit user with token...');
     try {
       const { data, error } = await supabase.functions.invoke('reddit-api', {
         body: { 
@@ -34,16 +35,20 @@ export function useRedditAuth() {
         }
       });
 
-      console.log('Supabase function response:', { data, error });
+      console.log('Reddit user fetch response:', { data, error });
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw error;
+        throw new Error(error.message || 'Failed to fetch Reddit user data');
       }
       
       if (data && data.error) {
         console.error('Reddit API returned error:', data.error);
         throw new Error(data.error);
+      }
+
+      if (!data || !data.name) {
+        throw new Error('Invalid user data received from Reddit');
       }
 
       console.log('Reddit user data received:', data);
@@ -72,7 +77,7 @@ export function useRedditAuth() {
       
       toast({
         title: "Authentication Error",
-        description: "Failed to fetch Reddit user data. Please reconnect your account.",
+        description: error.message || "Failed to fetch Reddit user data. Please reconnect your account.",
         variant: "destructive",
       });
     }

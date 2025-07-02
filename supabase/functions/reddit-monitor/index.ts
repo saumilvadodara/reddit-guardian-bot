@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
 
@@ -20,7 +19,7 @@ serve(async (req) => {
 
     console.log('Starting Reddit monitoring process...');
 
-    // Get all active monitoring rules
+    // Get all active monitoring rules with user profiles to get Reddit tokens
     const { data: monitoringRules, error: rulesError } = await supabase
       .from('monitoring_rules')
       .select(`
@@ -66,10 +65,14 @@ serve(async (req) => {
       }
     };
 
-    // Helper function to fetch Reddit content
-    const fetchRedditContent = async (subredditName: string, monitoringType: string) => {
+    // Helper function to fetch Reddit content with token
+    const fetchRedditContent = async (subredditName: string, monitoringType: string, userId: string) => {
       try {
-        // Call the reddit-api function to get content
+        // For now, we'll use mock data since we need to implement user token storage
+        // In a real implementation, you would get the user's Reddit token from the database
+        console.log(`Mock fetching ${monitoringType} from r/${subredditName} for user ${userId}`);
+        
+        // Call the reddit-api function to get content (will fall back to mock data)
         const response = await supabase.functions.invoke('reddit-api', {
           body: { 
             action: 'get_content',
@@ -96,10 +99,11 @@ serve(async (req) => {
       try {
         console.log(`Processing rule: ${rule.name} for subreddit: ${rule.communities?.subreddit_name}`);
 
-        // Fetch real Reddit content
+        // Fetch Reddit content (currently mock data)
         const redditContent = await fetchRedditContent(
           rule.communities?.subreddit_name,
-          rule.monitoring_type
+          rule.monitoring_type,
+          rule.communities?.user_id
         );
 
         console.log(`Found ${redditContent.length} ${rule.monitoring_type} in r/${rule.communities?.subreddit_name}`);
