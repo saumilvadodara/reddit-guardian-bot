@@ -48,6 +48,29 @@ serve(async (req) => {
 
     let totalAlertsCreated = 0;
 
+    // Helper function to analyze content with OpenAI
+    const analyzeWithOpenAI = async (content: string, prompt: string) => {
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/openai-content-analysis`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({ content, prompt }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`OpenAI analysis failed: ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error('Error calling OpenAI analysis:', error);
+        return { flagged: false, reason: 'Analysis failed', confidence: 0 };
+      }
+    };
+
     // Process each monitoring rule
     for (const rule of monitoringRules) {
       try {
@@ -65,52 +88,73 @@ serve(async (req) => {
           continue;
         }
 
-        // For now, we'll create a sample alert to demonstrate the functionality
-        // In a real implementation, you would:
-        // 1. Use the stored Reddit token to fetch recent posts/comments
-        // 2. Check if they match the keywords
-        // 3. Create alerts for matches
+        // For demonstration, create sample content to analyze
+        const sampleContent = `Check out this amazing deal on our new product! Get 50% off with code SAVE50. Limited time offer! Click the link in my bio to order now. This is totally not spam, I'm just sharing a great opportunity with the community.`;
 
-        // Check if we have keywords to monitor
-        if (!rule.keywords || rule.keywords.length === 0) {
-          console.log(`No keywords found for rule ${rule.name}, skipping...`);
-          continue;
-        }
+        let shouldCreateAlert = false;
+        let alertReason = '';
 
-        // Create a sample alert for demonstration
-        // This would be replaced with actual Reddit API calls
-        const alertData = {
-          user_id: rule.user_id,
-          community_id: rule.community_id,
-          monitoring_rule_id: rule.id,
-          title: `Keyword match detected: ${rule.keywords[0]}`,
-          description: `A ${rule.monitoring_type} in r/${rule.communities?.subreddit_name} matched your monitoring rule "${rule.name}". Keywords: ${rule.keywords.join(', ')}`,
-          severity: 'medium',
-          is_read: false
-        };
-
-        // Check if we already created an alert recently (to avoid duplicates)
-        const { data: existingAlert } = await supabase
-          .from('alerts')
-          .select('id')
-          .eq('monitoring_rule_id', rule.id)
-          .eq('title', alertData.title)
-          .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-          .single();
-
-        if (!existingAlert) {
-          const { error: alertError } = await supabase
-            .from('alerts')
-            .insert(alertData);
-
-          if (alertError) {
-            console.error('Error creating alert:', alertError);
-          } else {
-            console.log(`Created alert for rule: ${rule.name}`);
-            totalAlertsCreated++;
+        if (rule.use_openai && rule.openai_prompt) {
+          // Use OpenAI analysis
+          console.log(`Using OpenAI analysis for rule: ${rule.name}`);
+          const analysis = await analyzeWithOpenAI(sampleContent, rule.openai_prompt);
+          
+          if (analysis.flagged && analysis.confidence > 0.5) {
+            shouldCreateAlert = true;
+            alertReason = `AI Analysis: ${analysis.reason}`;
           }
         } else {
-          console.log(`Alert already exists for rule: ${rule.name}`);
+          // Use keyword matching
+          if (!rule.keywords || rule.keywords.length === 0) {
+            console.log(`No keywords found for rule ${rule.name}, skipping...`);
+            continue;
+          }
+
+          const hasMatchingKeyword = rule.keywords.some(keyword => 
+            sampleContent.toLowerCase().includes(keyword.toLowerCase())
+          );
+
+          if (hasMatchingKeyword) {
+            shouldCreateAlert = true;
+            alertReason = `Keyword match detected: ${rule.keywords.join(', ')}`;
+          }
+        }
+
+        if (shouldCreateAlert) {
+          // Check if we already created an alert recently (to avoid duplicates)
+          const { data: existingAlert } = await supabase
+            .from('alerts')
+            .select('id')
+            .eq('monitoring_rule_id', rule.id)
+            .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
+            .single();
+
+          if (!existingAlert) {
+            const alertData = {
+              user_id: rule.user_id,
+              community_id: rule.community_id,
+              monitoring_rule_id: rule.id,
+              title: rule.use_openai ? `AI flagged content in rule: ${rule.name}` : `Keyword match detected: ${rule.name}`,
+              description: `A ${rule.monitoring_type} in r/${rule.communities?.subreddit_name} was flagged by monitoring rule "${rule.name}". ${alertReason}`,
+              severity: rule.use_openai ? 'high' : 'medium',
+              is_read: false
+            };
+
+            const { error: alertError } = await supabase
+              .from('alerts')
+              .insert(alertData);
+
+            if (alertError) {
+              console.error('Error creating alert:', alertError);
+            } else {
+              console.log(`Created alert for rule: ${rule.name}`);
+              totalAlertsCreated++;
+            }
+          } else {
+            console.log(`Alert already exists for rule: ${rule.name}`);
+          }
+        } else {
+          console.log(`No violations detected for rule: ${rule.name}`);
         }
 
       } catch (error) {

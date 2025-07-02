@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, Brain } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -30,15 +30,36 @@ export function MonitoringRuleForm({ communities, onRuleCreated }: MonitoringRul
     community_id: '',
     monitoring_type: 'comments' as MonitoringType,
     keywords: '',
-    is_active: true
+    is_active: true,
+    use_openai: false,
+    openai_prompt: ''
   });
 
   const createMonitoringRule = async () => {
     if (!user || !newRule.name || !newRule.community_id) return;
 
+    // Validate that either keywords or OpenAI prompt is provided
+    if (!newRule.use_openai && !newRule.keywords.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide keywords or enable AI monitoring with a prompt",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newRule.use_openai && !newRule.openai_prompt.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide an AI prompt for OpenAI monitoring",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const keywordsArray = newRule.keywords.split(',').map(k => k.trim()).filter(k => k);
+      const keywordsArray = newRule.keywords ? newRule.keywords.split(',').map(k => k.trim()).filter(k => k) : null;
       
       const { error } = await supabase
         .from('monitoring_rules')
@@ -48,7 +69,9 @@ export function MonitoringRuleForm({ communities, onRuleCreated }: MonitoringRul
           community_id: newRule.community_id,
           monitoring_type: newRule.monitoring_type,
           keywords: keywordsArray,
-          is_active: newRule.is_active
+          is_active: newRule.is_active,
+          use_openai: newRule.use_openai,
+          openai_prompt: newRule.use_openai ? newRule.openai_prompt : null
         });
 
       if (error) throw error;
@@ -64,7 +87,9 @@ export function MonitoringRuleForm({ communities, onRuleCreated }: MonitoringRul
         community_id: '',
         monitoring_type: 'comments' as MonitoringType,
         keywords: '',
-        is_active: true
+        is_active: true,
+        use_openai: false,
+        openai_prompt: ''
       });
       
       onRuleCreated();
@@ -88,11 +113,11 @@ export function MonitoringRuleForm({ communities, onRuleCreated }: MonitoringRul
           Create Monitoring Rule
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Monitoring Rule</DialogTitle>
           <DialogDescription>
-            Set up automated monitoring for your communities
+            Set up automated monitoring for your communities using keywords or AI analysis
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -143,15 +168,48 @@ export function MonitoringRuleForm({ communities, onRuleCreated }: MonitoringRul
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="keywords">Keywords (comma-separated)</Label>
-            <Textarea
-              id="keywords"
-              placeholder="spam, promotion, affiliate, buy now"
-              value={newRule.keywords}
-              onChange={(e) => setNewRule({ ...newRule, keywords: e.target.value })}
+          <div className="flex items-center space-x-2 p-4 border rounded-lg">
+            <Brain className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              <Label htmlFor="use-openai" className="text-sm font-medium">
+                AI-Powered Monitoring
+              </Label>
+              <p className="text-xs text-gray-500">
+                Use OpenAI to analyze content with custom prompts
+              </p>
+            </div>
+            <Switch
+              id="use-openai"
+              checked={newRule.use_openai}
+              onCheckedChange={(checked) => setNewRule({ ...newRule, use_openai: checked })}
             />
           </div>
+
+          {newRule.use_openai ? (
+            <div>
+              <Label htmlFor="openai-prompt">AI Analysis Prompt</Label>
+              <Textarea
+                id="openai-prompt"
+                placeholder="e.g., Analyze this content for potential spam, self-promotion, or rule violations. Look for subtle promotional language, affiliate links, or content that doesn't add value to the community..."
+                value={newRule.openai_prompt}
+                onChange={(e) => setNewRule({ ...newRule, openai_prompt: e.target.value })}
+                rows={4}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Describe what you want the AI to look for in the content
+              </p>
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="keywords">Keywords (comma-separated)</Label>
+              <Textarea
+                id="keywords"
+                placeholder="spam, promotion, affiliate, buy now"
+                value={newRule.keywords}
+                onChange={(e) => setNewRule({ ...newRule, keywords: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className="flex items-center space-x-2">
             <Switch

@@ -117,7 +117,9 @@ export type Database = {
           keywords: string[] | null
           monitoring_type: Database["public"]["Enums"]["monitoring_type"]
           name: string
+          openai_prompt: string | null
           updated_at: string
+          use_openai: boolean | null
           user_id: string
         }
         Insert: {
@@ -128,7 +130,9 @@ export type Database = {
           keywords?: string[] | null
           monitoring_type: Database["public"]["Enums"]["monitoring_type"]
           name: string
+          openai_prompt?: string | null
           updated_at?: string
+          use_openai?: boolean | null
           user_id: string
         }
         Update: {
@@ -139,7 +143,9 @@ export type Database = {
           keywords?: string[] | null
           monitoring_type?: Database["public"]["Enums"]["monitoring_type"]
           name?: string
+          openai_prompt?: string | null
           updated_at?: string
+          use_openai?: boolean | null
           user_id?: string
         }
         Relationships: [

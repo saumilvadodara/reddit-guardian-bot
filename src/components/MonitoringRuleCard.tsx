@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Play, Pause, Settings } from "lucide-react";
+import { Eye, Play, Pause, Settings, Brain } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,7 +52,15 @@ export function MonitoringRuleCard({ rule, onRuleUpdated }: MonitoringRuleCardPr
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{rule.name}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{rule.name}</CardTitle>
+            {rule.use_openai && (
+              <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                <Brain className="h-3 w-3 mr-1" />
+                AI
+              </Badge>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Badge className={getTypeColor(rule.monitoring_type)}>
               {rule.monitoring_type}
@@ -82,22 +90,31 @@ export function MonitoringRuleCard({ rule, onRuleUpdated }: MonitoringRuleCardPr
           </Badge>
         </div>
 
-        {rule.keywords && rule.keywords.length > 0 && (
+        {rule.use_openai ? (
           <div>
-            <span className="text-sm font-medium">Keywords:</span>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {rule.keywords.slice(0, 3).map((keyword, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {keyword}
-                </Badge>
-              ))}
-              {rule.keywords.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{rule.keywords.length - 3} more
-                </Badge>
-              )}
-            </div>
+            <span className="text-sm font-medium">AI Prompt:</span>
+            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+              {rule.openai_prompt || 'No prompt configured'}
+            </p>
           </div>
+        ) : (
+          rule.keywords && rule.keywords.length > 0 && (
+            <div>
+              <span className="text-sm font-medium">Keywords:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {rule.keywords.slice(0, 3).map((keyword, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {keyword}
+                  </Badge>
+                ))}
+                {rule.keywords.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{rule.keywords.length - 3} more
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )
         )}
 
         <div className="flex gap-2 pt-2">
