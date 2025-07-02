@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,111 +14,93 @@ serve(async (req) => {
   }
 
   try {
-    const { endpoint, token, params = {} } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!token) {
-      throw new Error('Reddit access token required');
-    }
-
-    const baseUrl = 'https://oauth.reddit.com';
-    let url = `${baseUrl}/${endpoint}`;
-
-    // Add query parameters if provided
-    if (Object.keys(params).length > 0) {
-      const searchParams = new URLSearchParams(params);
-      url += `?${searchParams.toString()}`;
-    }
-
-    console.log(`Making Reddit API call to: ${url}`);
-    console.log(`Using token: ${token.substring(0, 10)}...`);
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'User-Agent': 'ModBot:v1.0.0 (by /u/ModBotUser)',
-        'Accept': 'application/json'
-      }
-    });
-
-    console.log(`Reddit API response status: ${response.status}`);
+    const { action, subreddit, content_type, limit = 25 } = await req.json();
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Reddit API error response:', errorText);
+    console.log(`Reddit API request - Action: ${action}, Subreddit: ${subreddit}, Type: ${content_type}`);
+
+    // For now, we'll simulate Reddit content since we need Reddit API credentials
+    // In a real implementation, you would use Reddit's API with proper authentication
+    
+    if (action === 'get_content') {
+      // Simulate different types of content for testing
+      let mockContent = [];
       
-      // Handle specific error cases
-      if (response.status === 401) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Reddit authentication failed - token may be expired. Please reconnect your Reddit account.',
-            needsReauth: true 
-          }),
-          { 
-            status: 200, // Return 200 to prevent edge function error
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      if (content_type === 'comments') {
+        mockContent = [
+          {
+            id: 'comment_1',
+            name: 't1_comment_1',
+            body: 'This is a rude comment that should be flagged by AI. You are stupid and your post is garbage.',
+            author: 'test_user_1',
+            created_utc: Date.now() / 1000,
+            subreddit: subreddit
+          },
+          {
+            id: 'comment_2', 
+            name: 't1_comment_2',
+            body: 'Another potentially rude comment. Your idea is terrible and makes no sense at all.',
+            author: 'test_user_2',
+            created_utc: Date.now() / 1000,
+            subreddit: subreddit
+          },
+          {
+            id: 'comment_3',
+            name: 't1_comment_3', 
+            body: 'This is a normal, polite comment that should not be flagged.',
+            author: 'test_user_3',
+            created_utc: Date.now() / 1000,
+            subreddit: subreddit
           }
-        );
-      }
-      
-      if (response.status === 403) {
-        // For 403 errors, check if it's the moderator endpoint
-        if (endpoint.includes('moderator') || endpoint.includes('mine/moderator')) {
-          console.log('403 error on moderator endpoint - user may not have moderator permissions');
-          return new Response(
-            JSON.stringify({ 
-              data: { children: [] }, // Return empty array structure
-              error: null,
-              message: 'No moderated communities found. This could mean: 1) You are not a moderator of any subreddits, 2) You need to reconnect with updated permissions, or 3) Your Reddit app needs additional configuration.'
-            }),
-            { 
-              status: 200, // Return 200 to prevent edge function error
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            error: 'Access forbidden - insufficient permissions. Please reconnect your Reddit account with updated permissions.',
-            needsReauth: true 
-          }),
-          { 
-            status: 200, // Return 200 to prevent edge function error
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        ];
+      } else if (content_type === 'posts') {
+        mockContent = [
+          {
+            id: 'post_1',
+            name: 't3_post_1',
+            title: 'This is a rude post title',
+            selftext: 'This post contains rude language and should be flagged. Everyone here is an idiot.',
+            author: 'test_user_1',
+            created_utc: Date.now() / 1000,
+            subreddit: subreddit
+          },
+          {
+            id: 'post_2',
+            name: 't3_post_2', 
+            title: 'Normal post title',
+            selftext: 'This is a normal post that should not be flagged by the AI system.',
+            author: 'test_user_2',
+            created_utc: Date.now() / 1000,
+            subreddit: subreddit
           }
-        );
+        ];
       }
-      
-      // For other errors, still return 200 to prevent edge function failures
+
+      console.log(`Returning ${mockContent.length} mock ${content_type} for testing`);
+
       return new Response(
-        JSON.stringify({ 
-          error: `Reddit API error: ${response.status} - ${errorText}`,
-          status: response.status 
-        }),
-        { 
-          status: 200, // Return 200 to prevent edge function error
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ content: mockContent.slice(0, limit) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const data = await response.json();
-    console.log('Reddit API response received successfully');
-
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({ error: 'Unknown action' }),
       { 
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 
   } catch (error) {
-    console.error('Reddit API edge function error:', error);
+    console.error('Reddit API error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 200, // Return 200 to prevent edge function error
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

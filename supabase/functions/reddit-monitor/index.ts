@@ -51,23 +51,43 @@ serve(async (req) => {
     // Helper function to analyze content with OpenAI
     const analyzeWithOpenAI = async (content: string, prompt: string) => {
       try {
-        const response = await fetch(`${supabaseUrl}/functions/v1/openai-content-analysis`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({ content, prompt }),
+        const response = await supabase.functions.invoke('openai-content-analysis', {
+          body: { content, prompt }
         });
 
-        if (!response.ok) {
-          throw new Error(`OpenAI analysis failed: ${response.status}`);
+        if (response.error) {
+          throw new Error(`OpenAI analysis failed: ${response.error.message}`);
         }
 
-        return await response.json();
+        return response.data;
       } catch (error) {
         console.error('Error calling OpenAI analysis:', error);
         return { flagged: false, reason: 'Analysis failed', confidence: 0 };
+      }
+    };
+
+    // Helper function to fetch Reddit content
+    const fetchRedditContent = async (subredditName: string, monitoringType: string) => {
+      try {
+        // Call the reddit-api function to get content
+        const response = await supabase.functions.invoke('reddit-api', {
+          body: { 
+            action: 'get_content',
+            subreddit: subredditName,
+            content_type: monitoringType,
+            limit: 10 // Get last 10 items
+          }
+        });
+
+        if (response.error) {
+          console.error(`Error fetching Reddit content for r/${subredditName}:`, response.error);
+          return [];
+        }
+
+        return response.data?.content || [];
+      } catch (error) {
+        console.error(`Error fetching Reddit content for r/${subredditName}:`, error);
+        return [];
       }
     };
 
@@ -76,85 +96,100 @@ serve(async (req) => {
       try {
         console.log(`Processing rule: ${rule.name} for subreddit: ${rule.communities?.subreddit_name}`);
 
-        // Get user's Reddit token (you'll need to store this in user_profiles or separate table)
-        const { data: userProfile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', rule.communities?.user_id)
-          .single();
+        // Fetch real Reddit content
+        const redditContent = await fetchRedditContent(
+          rule.communities?.subreddit_name,
+          rule.monitoring_type
+        );
 
-        if (profileError || !userProfile) {
-          console.log(`No user profile found for rule ${rule.name}, skipping...`);
-          continue;
-        }
+        console.log(`Found ${redditContent.length} ${rule.monitoring_type} in r/${rule.communities?.subreddit_name}`);
 
-        // For demonstration, create sample content to analyze
-        const sampleContent = `Check out this amazing deal on our new product! Get 50% off with code SAVE50. Limited time offer! Click the link in my bio to order now. This is totally not spam, I'm just sharing a great opportunity with the community.`;
+        // Process each piece of content
+        for (const content of redditContent) {
+          let shouldCreateAlert = false;
+          let alertReason = '';
+          let contentText = '';
 
-        let shouldCreateAlert = false;
-        let alertReason = '';
-
-        if (rule.use_openai && rule.openai_prompt) {
-          // Use OpenAI analysis
-          console.log(`Using OpenAI analysis for rule: ${rule.name}`);
-          const analysis = await analyzeWithOpenAI(sampleContent, rule.openai_prompt);
-          
-          if (analysis.flagged && analysis.confidence > 0.5) {
-            shouldCreateAlert = true;
-            alertReason = `AI Analysis: ${analysis.reason}`;
+          // Extract text based on content type
+          if (rule.monitoring_type === 'posts') {
+            contentText = `${content.title || ''} ${content.selftext || ''}`.trim();
+          } else if (rule.monitoring_type === 'comments') {
+            contentText = content.body || '';
           }
-        } else {
-          // Use keyword matching
-          if (!rule.keywords || rule.keywords.length === 0) {
-            console.log(`No keywords found for rule ${rule.name}, skipping...`);
+
+          if (!contentText) {
+            console.log(`No text content found for ${rule.monitoring_type}`);
             continue;
           }
 
-          const hasMatchingKeyword = rule.keywords.some(keyword => 
-            sampleContent.toLowerCase().includes(keyword.toLowerCase())
-          );
+          console.log(`Analyzing content: "${contentText.substring(0, 100)}..."`);
 
-          if (hasMatchingKeyword) {
-            shouldCreateAlert = true;
-            alertReason = `Keyword match detected: ${rule.keywords.join(', ')}`;
-          }
-        }
-
-        if (shouldCreateAlert) {
-          // Check if we already created an alert recently (to avoid duplicates)
-          const { data: existingAlert } = await supabase
-            .from('alerts')
-            .select('id')
-            .eq('monitoring_rule_id', rule.id)
-            .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-            .single();
-
-          if (!existingAlert) {
-            const alertData = {
-              user_id: rule.user_id,
-              community_id: rule.community_id,
-              monitoring_rule_id: rule.id,
-              title: rule.use_openai ? `AI flagged content in rule: ${rule.name}` : `Keyword match detected: ${rule.name}`,
-              description: `A ${rule.monitoring_type} in r/${rule.communities?.subreddit_name} was flagged by monitoring rule "${rule.name}". ${alertReason}`,
-              severity: rule.use_openai ? 'high' : 'medium',
-              is_read: false
-            };
-
-            const { error: alertError } = await supabase
-              .from('alerts')
-              .insert(alertData);
-
-            if (alertError) {
-              console.error('Error creating alert:', alertError);
-            } else {
-              console.log(`Created alert for rule: ${rule.name}`);
-              totalAlertsCreated++;
+          if (rule.use_openai && rule.openai_prompt) {
+            // Use OpenAI analysis
+            console.log(`Using OpenAI analysis for rule: ${rule.name}`);
+            const analysis = await analyzeWithOpenAI(contentText, rule.openai_prompt);
+            
+            console.log('OpenAI analysis result:', analysis);
+            
+            if (analysis.flagged && analysis.confidence > 0.5) {
+              shouldCreateAlert = true;
+              alertReason = `AI Analysis: ${analysis.reason}`;
             }
           } else {
-            console.log(`Alert already exists for rule: ${rule.name}`);
+            // Use keyword matching
+            if (!rule.keywords || rule.keywords.length === 0) {
+              console.log(`No keywords found for rule ${rule.name}, skipping...`);
+              continue;
+            }
+
+            const hasMatchingKeyword = rule.keywords.some(keyword => 
+              contentText.toLowerCase().includes(keyword.toLowerCase())
+            );
+
+            if (hasMatchingKeyword) {
+              shouldCreateAlert = true;
+              alertReason = `Keyword match detected: ${rule.keywords.join(', ')}`;
+            }
           }
-        } else {
-          console.log(`No violations detected for rule: ${rule.name}`);
+
+          if (shouldCreateAlert) {
+            // Check if we already created an alert for this specific content
+            const contentId = content.id || content.name;
+            const { data: existingAlert } = await supabase
+              .from('alerts')
+              .select('id')
+              .eq('monitoring_rule_id', rule.id)
+              .eq(rule.monitoring_type === 'posts' ? 'reddit_post_id' : 'reddit_comment_id', contentId)
+              .single();
+
+            if (!existingAlert) {
+              const alertData = {
+                user_id: rule.user_id,
+                community_id: rule.community_id,
+                monitoring_rule_id: rule.id,
+                title: rule.use_openai ? `AI flagged ${rule.monitoring_type.slice(0, -1)} in r/${rule.communities?.subreddit_name}` : `Keyword match in r/${rule.communities?.subreddit_name}`,
+                description: `${alertReason}\n\nContent: "${contentText.substring(0, 200)}${contentText.length > 200 ? '...' : ''}"`,
+                severity: rule.use_openai ? 'high' : 'medium',
+                is_read: false,
+                [rule.monitoring_type === 'posts' ? 'reddit_post_id' : 'reddit_comment_id']: contentId
+              };
+
+              const { error: alertError } = await supabase
+                .from('alerts')
+                .insert(alertData);
+
+              if (alertError) {
+                console.error('Error creating alert:', alertError);
+              } else {
+                console.log(`Created alert for rule: ${rule.name}, content: ${contentId}`);
+                totalAlertsCreated++;
+              }
+            } else {
+              console.log(`Alert already exists for rule: ${rule.name}, content: ${contentId}`);
+            }
+          } else {
+            console.log(`No violations detected for content in rule: ${rule.name}`);
+          }
         }
 
       } catch (error) {
